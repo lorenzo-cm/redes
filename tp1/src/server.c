@@ -8,22 +8,27 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include "common_maze.h"
+#include "server_maze.h"
+
 #define BUFSZ 1024
 
 void usage(int argc, char **argv){
-    printf("usage: %s <v4|v6> <server port>\n", argv[0]);
-    printf("example: %s v4 51511\n", argv[0]);
+    printf("usage: %s <v4|v6> <server port> -i <input_file>\n", argv[0]);
+    printf("example: %s v4 51511 -i data/in.txt\n", argv[0]);
 }
 
 int main(int argc, char **argv){
 
-    if (argc < 3){
+    if (argc < 4){
         usage(argc, argv);
+        return EXIT_FAILURE;
     }
 
     struct sockaddr_storage storage;
     if (0 != server_sockaddr_init(argv[1], argv[2], &storage)){
         usage(argc, argv);
+        return EXIT_FAILURE;
     }
 
     int s;
@@ -46,10 +51,6 @@ int main(int argc, char **argv){
         logexit("listen");
     }
 
-    char addrstr[BUFSZ];
-    addrtostr(addr, addrstr, BUFSZ);
-    printf("bound to %s, waiting connections\n", addrstr);
-
     while(1){
         struct sockaddr_storage cstorage;
         struct sockaddr *caddr = (struct sockaddr *)(&cstorage);
@@ -62,24 +63,31 @@ int main(int argc, char **argv){
             logexit("accept");
         }
 
-        char caddrstr[BUFSZ];
-        addrtostr(caddr, caddrstr, BUFSZ);
-        printf("[log] connection from %s\n", caddrstr);
+        printf("client connected\n");
 
-        char buf[BUFSZ];
-        memset(buf, 0, BUFSZ);
-        size_t count = recv(csock, buf, BUFSZ, 0);
+        struct action send_action;
+        struct action recv_action;
+        size_t size_action = sizeof(send_action);
+        while(1){
+            reset_action(&(recv_action));
+            size_t count = recv(csock, &(recv_action), size_action, 0);
+            
+            if(count == 0){
+                // client disconnected
+                break;
+            }
 
-        printf("[msg] %s, %d bytes: %s\n", caddrstr, (int)count, buf);
+            reset_action(&(send_action));
+            server_action_handler(argc, argv, &(recv_action), &(send_action));
+            count = send(csock, &(send_action), size_action, 0);
 
-        sprintf(buf, "remote endpoint: %.1000s\n", caddrstr);
+            if(count != size_action){
+                logexit("send");
+            }
 
-        count = send(csock, buf, strlen(buf) + 1, 0);
-
-        if(count != strlen(buf) + 1){
-            logexit("send");
         }
 
+        printf("client disconnected\n");
         close(csock);
     }
 

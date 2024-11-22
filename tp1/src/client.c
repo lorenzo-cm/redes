@@ -9,6 +9,9 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include "common_maze.h"
+#include "client_maze.h"
+
 #define BUFSZ 1024
 
 void usage(int argc, char **argv){
@@ -39,41 +42,51 @@ int main(int argc, char **argv){
         logexit("connect");
     }
 
-    char addrstr[BUFSZ];
 
-    addrtostr(addr, addrstr, BUFSZ);
-
-    printf("connected to %s\n", addrstr);
-
+    struct action send_action;
+    struct action recv_action;
+    size_t size_action = sizeof(send_action);
     char buf[BUFSZ];
-    memset(buf, 0, BUFSZ);
-
-    printf("mensagem> ");
-    fgets(buf, BUFSZ-1, stdin);
-
-    size_t count = send(s, buf, strlen(buf)+1, 0);
-
-    if (count != strlen(buf)+1) {
-        logexit("send");
-    }
-
-
-    memset(buf, 0, BUFSZ);
-    unsigned total = 0;
+    int aux_type = -1;
+    
     while(1){
-        count = recv(s, buf + total, BUFSZ-total, 0);
+        reset_action(&(send_action));
+        aux_type = -1;
+
+        printf("> ");
+        fgets(buf, size_action-1, stdin);
+
+        if(strcmp(buf, "exit\n") == 0){
+            break;
+        }
+
+        send_action.type = aux_type = action2type(buf);
+        
+        if(0 == client_action_handler(&(recv_action), &(send_action), buf)){
+            printf("\n");
+            continue;
+        }
+
+        size_t count = send(s, &(send_action), size_action, 0);
+
+        if (count != size_action) {
+            logexit("send");
+        }
+
+        reset_action(&(recv_action));
+        count = recv(s, &(recv_action), size_action, 0);
+
         if (count == 0){
             // connection terminated
             break;
         }
 
-        total += count;
+        client_pos_action_handler(recv_action, aux_type);
+        printf("\n");
     }
 
+    printf("connection closed\n");
     close(s);
-
-    printf("received %u bytes\n", total);
-    puts(buf);
 
     exit(EXIT_SUCCESS);
 
