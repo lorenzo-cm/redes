@@ -13,20 +13,20 @@
 
 #define BUFSZ 1024
 
-void usage(int argc, char **argv){
+void usage(){
     printf("Usage: ./server <v4|v6> <port>\n");
 }
 
 int main(int argc, char **argv){
 
     if (argc < 3){
-        usage(argc, argv);
+        usage();
         return EXIT_FAILURE;
     }
 
     struct sockaddr_storage storage;
     if (0 != server_sockaddr_init(argv[1], argv[2], &storage)){
-        usage(argc, argv);
+        usage();
         return EXIT_FAILURE;
     }
 

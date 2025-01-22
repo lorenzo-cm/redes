@@ -60,7 +60,7 @@ int main(int argc, char **argv){
 
     struct sockaddr_storage storage;
     if (0 != addrparse(argv[1], argv[2], &storage)){
-        usage(argc, argv);
+        usage();
     }
 
     int s;
